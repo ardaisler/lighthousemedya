@@ -26,8 +26,20 @@ foreach ($required as $field) {
 }
 
 // O tarih+saat dolu mu kontrol et
-$check = $pdo->prepare("SELECT id FROM randevular WHERE tarih = ? AND saat = ? AND durum != 'iptal'");
-$check->execute([$data['tarih'], $data['saat']]);
+$check = $pdo->prepare("
+    SELECT id
+    FROM randevular
+    WHERE hizmet = ?
+      AND tarih = ?
+      AND saat = ?
+      AND durum != 'iptal'
+");
+
+$check->execute([
+    $data['hizmet'],
+    $data['tarih'],
+    $data['saat']
+]);
 if ($check->fetch()) {
     echo json_encode(['success' => false, 'error' => 'Bu tarih ve saat dolu. Lütfen başka bir saat seçin.']);
     exit;

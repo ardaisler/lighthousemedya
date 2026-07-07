@@ -254,7 +254,10 @@ $tumSaatler=saatleriUret($_bas,$_bit,$_aralik);
       <div class="step-panel" id="panel-3">
         <div class="form-row"><div class="form-group"><label>Ad</label><input type="text" id="inp-ad" placeholder="Adınız" oninput="validateForm()"/></div><div class="form-group"><label>Soyad</label><input type="text" id="inp-soyad" placeholder="Soyadınız" oninput="validateForm()"/></div></div>
         <div class="form-row"><div class="form-group"><label>Telefon</label><input type="tel" id="inp-tel" placeholder="0 5XX XXX XX XX" oninput="this.value=this.value.replace(/[^0-9\s+\-]/g,'');validateForm()" inputmode="numeric"/><div id="err-tel" style="color:#e53e3e;font-size:11px;margin-top:4px;display:none">Geçerli bir telefon numarası girin (en az 10 rakam)</div></div><div class="form-group"><label>E-posta</label><input type="email" id="inp-mail" placeholder="ornek@mail.com" oninput="validateForm()"/><div id="err-mail" style="color:#e53e3e;font-size:11px;margin-top:4px;display:none">Geçerli bir e-posta adresi girin</div></div></div>
-        <div class="form-group"><label>Notlar (isteğe bağlı)</label><textarea id="inp-not" placeholder="Özel isteklerinizi yazabilirsiniz..."></textarea></div>
+        <div class="form-group">
+    <label>Notlar *</label>
+    <textarea id="inp-not" placeholder="Özel isteklerinizi yazabilirsiniz..." oninput="validateForm()"></textarea>
+</div>
         <div class="modal-footer"><button class="btn-back" onclick="goStep(2)">← Geri</button><button class="btn-next" id="btn-next-3" onclick="goStep(4)" disabled>Özete Git →</button></div>
       </div>
       <div class="step-panel" id="panel-4">
@@ -275,13 +278,41 @@ $tumSaatler=saatleriUret($_bas,$_bit,$_aralik);
   </div>
 
   <script>
-    const BACKEND='api';
+    const BACKEND='/lighthousemedya/api';
     const TUM_SAATLER=<?= json_encode($tumSaatler) ?>;
     const state={service:null,date:null,time:null,currentMonth:new Date().getMonth(),currentYear:new Date().getFullYear(),doluSaatler:{}};
     const DAYS=['Pzt','Sal','Çar','Per','Cum','Cmt','Paz'];
     const MONTHS=['Ocak','Şubat','Mart','Nisan','Mayıs','Haziran','Temmuz','Ağustos','Eylül','Ekim','Kasım','Aralık'];
     function setLoading(v){document.getElementById('loadingOverlay').classList.toggle('show',v)}
-    async function fetchDoluTarihler(){try{const r=await fetch(BACKEND+'/dolu_tarihler.php');const d=await r.json();if(d.success)state.doluSaatler=d.dolu;}catch(e){}}
+async function fetchDoluTarihler(){
+
+    if(!state.service){
+        state.doluSaatler={};
+        return;
+    }
+
+    try{
+          console.log("Gönderilen hizmet:", state.service);
+        const url = BACKEND + "/dolu_tarihler.php?hizmet=" + encodeURIComponent(state.service);
+
+        console.log("URL:", url);
+
+        const r = await fetch(url);
+
+        const d = await r.json();
+
+        console.log("Seçilen hizmet:", state.service);
+        console.log("API cevabı:", d);
+
+        if(d.success){
+            state.doluSaatler = d.dolu;
+        }
+
+    }catch(e){
+        console.error(e);
+    }
+
+}
     async function openModal(){document.getElementById('modalOverlay').classList.add('open');document.body.style.overflow='hidden';setLoading(true);await fetchDoluTarihler();setLoading(false);renderCalendar();}
     function closeModal(){
         document.getElementById('modalOverlay').classList.remove('open');
@@ -308,7 +339,29 @@ $tumSaatler=saatleriUret($_bas,$_bit,$_aralik);
     }
     function handleOverlayClick(e){if(e.target===document.getElementById('modalOverlay'))closeModal();}
     function goStep(n){for(let i=1;i<=4;i++){const p=document.getElementById('panel-'+i);const t=document.getElementById('step-tab-'+i);if(p)p.classList.toggle('active',i===n);if(t){t.classList.remove('active','done');if(i===n)t.classList.add('active');else if(i<n)t.classList.add('done');}}document.getElementById('panel-success').classList.remove('active');if(n===4)renderSummary();}
-    function selectService(el,name){document.querySelectorAll('.svc-card').forEach(c=>c.classList.remove('selected'));el.classList.add('selected');state.service=name;document.getElementById('btn-next-1').disabled=false;}
+      async function selectService(el,name){
+
+    document.querySelectorAll('.svc-card').forEach(c=>{
+        c.classList.remove('selected');
+    });
+
+    el.classList.add('selected');
+
+state.service = name;
+
+state.date = null;
+state.time = null;
+
+state.doluSaatler = {};
+
+await fetchDoluTarihler();
+
+document.getElementById("time-section").style.display = "none";
+
+renderCalendar();
+
+    document.getElementById('btn-next-1').disabled=false;
+}
     function changeMonth(dir){state.currentMonth+=dir;if(state.currentMonth>11){state.currentMonth=0;state.currentYear++;}if(state.currentMonth<0){state.currentMonth=11;state.currentYear--;}renderCalendar();}
     function tumSaatlerDolu(dateStr){const d=state.doluSaatler[dateStr]||[];return TUM_SAATLER.every(s=>d.includes(s));}
     function renderCalendar(){const y=state.currentYear,m=state.currentMonth;document.getElementById('cal-month-label').textContent=MONTHS[m]+' '+y;const grid=document.getElementById('cal-grid');grid.innerHTML='';DAYS.forEach(d=>{const el=document.createElement('div');el.className='cal-day-name';el.textContent=d;grid.appendChild(el);});const fd=new Date(y,m,1).getDay();const off=fd===0?6:fd-1;const dim=new Date(y,m+1,0).getDate();const today=new Date();for(let i=0;i<off;i++){const el=document.createElement('div');el.className='cal-day empty';grid.appendChild(el);}for(let d=1;d<=dim;d++){const el=document.createElement('div');el.className='cal-day';el.textContent=d;const td=new Date(y,m,d);const isPast=td<new Date(today.getFullYear(),today.getMonth(),today.getDate());const ds=y+'-'+String(m+1).padStart(2,'0')+'-'+String(d).padStart(2,'0');if(isPast){el.classList.add('past');}else if(tumSaatlerDolu(ds)){el.classList.add('dolu');el.title='Bu gün dolu';}else{if(y===today.getFullYear()&&m===today.getMonth()&&d===today.getDate())el.classList.add('today');if(state.date===ds)el.classList.add('selected');el.onclick=()=>selectDate(ds,el);}grid.appendChild(el);}}
